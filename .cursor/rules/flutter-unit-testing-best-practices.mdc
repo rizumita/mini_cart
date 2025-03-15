@@ -1,0 +1,287 @@
+---
+description: Flutterのユニットテスト記述に関するベストプラクティスとルール
+globs: *.dart, *_test.dart, test/**/*.dart
+alwaysApply: false
+---
+# Flutterのユニットテスト - ベストプラクティスとルール
+
+## 1. テストの基本原則
+
+### 1.1 テストの重要性
+- ソフトウェアの品質を確保するための不可欠な要素
+- バグの早期発見と修正によるコスト削減
+- コードの振る舞いを文書化する手段
+- 安全なリファクタリングの基盤
+
+### 1.2 良いユニットテストの特徴
+- **テスト可能なコードから設計する**
+  - ビジネスロジックとUIコードを分離する
+  - 依存性注入を活用する
+  - クリーンアーキテクチャの原則に従う
+- **テストは小さく集中的に**
+  - 各ユニットテストは単一の機能や動作に焦点を当てる
+  - 複数の側面をカバーするテストは避ける
+  - 小さく集中したテストはデバッグが容易
+- **テストの独立性を確保**
+  - テスト間で状態が共有されないようにする
+  - モックオブジェクトを使用して単体をテストする
+  - 各テストは他のテストに依存せず、任意の順序で実行できる
+
+## 2. 日本語テスト記述のルール
+
+### 2.1 テストの命名と説明
+- **テスト名は説明的に**
+  - テストの目的が明確にわかる名前をつける
+  - 例: `testFunction` ではなく `testCalculatorAddOneShouldReturnCorrectResult`
+- **日本語でdescriptionを記述する**
+  - プロジェクトの規約に準拠
+  - 何をテストするのかを明確に記述する
+  - 「〜すること」という形式で統一する
+  - テスト条件と期待される結果の両方を含める
+
+```dart
+// 良い例
+test('数値に1を加算すると正しい値を返すこと', () {
+  expect(calculator.addOne(1), 2);
+});
+
+// 悪い例
+test('加算テスト', () {
+  // テストコード
+});
+```
+
+### 2.2 groupによるテストの整理
+- **関連するテストをグループ化**
+- **グループ名も日本語で統一**
+
+```dart
+group('Calculator クラスのテスト', () {
+  test('正の数の加算が正しく動作すること', () {
+    expect(calculator.add(1, 2), 3);
+  });
+  
+  test('負の数の加算が正しく動作すること', () {
+    expect(calculator.add(-1, -2), -3);
+  });
+});
+```
+
+### 2.3 テストのパラメータ化
+- 様々な入力値でのテストが必要な場合はパラメータ化したテストを使用
+- コードの冗長性を減らし、エッジケースのカバレッジを確保
+
+```dart
+test('数値に1を加算すると正しい値を返すこと', () {
+  final testCases = {0: 1, 1: 2, -1: 0};
+  testCases.forEach((input, expected) {
+    expect(calculator.addOne(input), expected);
+  });
+});
+```
+
+## 3. 境界値分析とエッジケース
+
+### 3.1 境界値分析の重要性
+- **バグが最も発生しやすい場所**
+  - 多くのバグは入力値の境界で発生する
+  - 範囲の端や特殊な値での振る舞いを確認することが重要
+- **効率的なテスト設計のために**
+  - すべての入力値をテストするのは非効率
+  - 境界値と代表値をテストすることで効果的にバグを発見できる
+
+### 3.2 境界値分析の実践
+- **数値範囲の境界値**
+  - 最小値、最小値-1、最小値+1
+  - 最大値、最大値-1、最大値+1
+  - 0（正負の境界）、典型的な正の値、典型的な負の値
+
+```dart
+test('年齢による割引率が正しく計算されること', () {
+  // 境界値のテスト（最小値、境界値、最大値）
+  expect(discountCalculator.getDiscount(0), 0.0);   // 最小値
+  expect(discountCalculator.getDiscount(18), 0.2);  // 境界値
+  expect(discountCalculator.getDiscount(65), 0.3);  // 境界値
+  expect(discountCalculator.getDiscount(120), 0.3); // 最大値
+});
+```
+
+- **リストや配列の境界値**
+  - 空のリスト
+  - 要素が1つのリスト
+  - 通常サイズのリスト
+
+```dart
+test('リストの先頭要素を取得する関数のテスト', () {
+  expect(() => listHelper.getFirstItem([]), throwsException); // 空リスト
+  expect(listHelper.getFirstItem([1]), 1);                    // 要素1つ
+  expect(listHelper.getFirstItem([1, 2, 3]), 1);              // 通常リスト
+});
+```
+
+### 3.3 その他のエッジケース
+- **空文字列と非ASCII文字**
+  - 空文字列、スペースのみ、特殊文字、多言語文字、絵文字など
+- **Null、未定義、無効な入力**
+  - null値、無効なフォーマット、予期しない型のデータ
+
+```dart
+test('メールアドレスのバリデーション', () {
+  // 代表的なエッジケース
+  expect(validator.isValid(null), false);              // null
+  expect(validator.isValid(""), false);                // 空文字
+  expect(validator.isValid("test@example.com"), true); // 正常系
+});
+```
+
+## 4. 特殊ケースのテスト記述
+
+### 4.1 非同期コードのテスト
+- 非同期操作は`async`/`await`を使用して明示的に記述する
+
+```dart
+test('APIからデータを取得できること', () async {
+  final data = await fetchDataFromApi();
+  expect(data, isNotNull);
+});
+```
+
+### 4.2 モックを使用したテスト
+- 外部依存をモックして分離してテストする
+
+```dart
+test('ユーザーサービスからデータを取得できること', () async {
+  // モックの設定
+  when(mockService.getUser('123')).thenReturn(User(id: '123', name: 'テスト'));
+  
+  // テスト実行と検証
+  final result = await repository.getUser('123');
+  expect(result.name, equals('テスト'));
+});
+```
+
+### 4.3 Mocktailを活用したモックの作成
+- **Mocktailの主な利点**
+  - コード生成が不要（`build_runner`の実行が不要）
+  - シンプルで直感的なAPI、`null safety`に対応
+  - インタフェースとクラスの両方をモック化可能
+
+```dart
+// 基本的な使用方法
+class MockApiClient extends Mock implements ApiClient {}
+
+test('Mocktailを使用したテスト', () async {
+  final mockClient = MockApiClient();
+  
+  // モックの振る舞いを定義
+  when(() => mockClient.getUser('123'))
+      .thenAnswer((_) async => User(id: '123', name: 'テスト'));
+  
+  // 検証
+  final user = await repository.getUserById('123');
+  expect(user.name, equals('テスト'));
+  verify(() => mockClient.getUser('123')).called(1);
+});
+```
+
+### 4.4 失敗ケースと異常系のテスト
+- **失敗ケースのテストの重要性**
+  - エラーハンドリングの検証
+  - システムの堅牢性の確保
+  - 例外やエラー状態からの回復確認
+
+```dart
+// 例外のテスト
+test('無効なIDで例外がスローされること', () {
+  expect(() => repository.getUserById(''), throwsA(isA<InvalidIdException>()));
+});
+
+// 非同期コードでの例外テスト
+test('APIエラー時の例外検証', () async {
+  when(() => mockClient.fetchData()).thenThrow(ApiException());
+  await expectLater(() => service.getData(), throwsA(isA<ApiException>()));
+});
+
+// 戻り値による失敗ケースのテスト
+test('無効な入力の場合はエラー結果を返すこと', () {
+  final result = validator.validate('');
+  expect(result.isValid, isFalse);
+  expect(result.errorMessage, isNotEmpty);
+});
+```
+
+- **異常系テスト命名のベストプラクティス**
+  - 「〜の場合に例外が発生すること」
+  - 「〜の場合にエラーメッセージを返すこと」
+  - 「〜の場合に失敗結果を返すこと」
+
+## 5. テストデータの管理
+
+### 5.1 テストフィクスチャの活用
+- `setUp`と`tearDown`を使用して再利用可能なテストデータを準備する
+- テストの独立性を保つためにテスト間でデータを分離する
+
+```dart
+void main() {
+  late User testUser;
+  
+  setUp(() {
+    testUser = User(id: '1', name: 'テストユーザー');
+  });
+  
+  test('ユーザー名が正しく取得できること', () {
+    expect(testUser.name, equals('テストユーザー'));
+  });
+}
+```
+
+### 5.2 ファクトリーメソッド
+- 再利用可能なテストデータ生成関数を作成する
+
+```dart
+// ファクトリーメソッド
+User createTestUser({String id = '1', String name = 'テスト'}) {
+  return User(id: id, name: name);
+}
+
+// 使用例
+test('IDフォーマットのテスト', () {
+  final user = createTestUser(id: '123');
+  expect(user.formattedId, equals('UID-123'));
+});
+```
+
+## 6. テストの品質向上
+
+### 6.1 コードカバレッジ
+- 重要なビジネスロジックは高いカバレッジを目指す
+- カバレッジのためだけのテストは避ける
+- エッジケースや異常系のテストも重視する
+
+### 6.2 テストスイートの保守
+- テストコードも実装コードと同じ品質基準で管理する
+- DRY（Don't Repeat Yourself）原則を適用する
+- 実装の詳細に依存するテストは避ける
+
+### 6.3 AIが判断に迷った箇所のマーク
+- **仕様不明・ライブラリ依存のケース**
+  - 仕様が不明確なメソッド
+  - 外部ライブラリへの依存が大きい部分
+  - 複雑な業務ロジックが関わる場面
+- **TODOコメントの活用**
+  - AIが判断に迷った箇所には明示的にTODOコメントを残す
+  - `// TODO: Check specification` のように具体的な確認事項を記載
+  - レビュー時に人間によるチェックが必要な箇所を明確にする
+
+```dart
+test('複雑な業務ロジックのテスト', () {
+  // TODO: Check specification - 正確な期待値が仕様書と照合必要
+  final result = processor.process(input);
+  expect(result.isProcessed, isTrue);
+});
+```
+
+- **ベストプラクティス**
+  - 不明確な仕様について質問するより、まず確認が必要な点を明示する
+  - 想定される動作を複数記述し、人間の判断を仰ぐ
+  - AIが推測した内容と確認が必要な理由を明記する

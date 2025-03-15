@@ -1,0 +1,359 @@
+---
+description: Go Router for Flutter - 2025 version knowledge
+globs: lib/**/*.dart, pubspec.yaml
+alwaysApply: false
+---
+# Go Router 14.0+ Flutter Integration
+
+## 概要
+
+Go Routerは、Flutter用の宣言的なルーティングパッケージで、Navigator 2.0 APIに基づいており、URLベースのナビゲーションを提供します。以下の機能を含む高度なルーティングソリューションです：
+
+- パスとクエリパラメータのテンプレート構文による解析（例：`user/:id`）
+- 複数画面の表示（サブルート）
+- リダイレクトサポート - アプリケーションの状態に基づいて別のURLへ再ルーティング
+- `StatefulShellRoute`を使用した複数のNavigatorのサポート（例：BottomNavigationBar）
+- MaterialとCupertinoアプリの両方をサポート
+- Navigator APIとの後方互換性
+- ディープリンクの処理
+
+## インストール
+
+最新バージョンをpubspec.yamlに追加します：
+
+```yaml
+dependencies:
+  go_router: ^14.8.0  # 2025年時点の最新バージョン
+```
+
+または以下のコマンドを使用します：
+
+```bash
+flutter pub add go_router
+```
+
+## 基本設定
+
+### ルーターの設定
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+// ルーター設定
+final router = GoRouter(
+  initialLocation: '/',  // 初期ルート
+  debugLogDiagnostics: true,  // デバッグログを有効化（開発時のみ）
+  routes: [
+    GoRoute(
+      name: 'home',  // 名前付きルート（オプション）
+      path: '/',
+      builder: (context, state) => HomeScreen(),
+    ),
+    GoRoute(
+      name: 'details',
+      path: '/details/:id',  // パラメータ付きパス
+      builder: (context, state) {
+        // URLからパラメータを取得
+        final id = state.pathParameters['id']!;
+        return DetailsScreen(id: id);
+      },
+    ),
+  ],
+);
+```
+
+### アプリケーションへの適用
+
+```dart
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp.router(
+      title: 'Go Router Example',
+      // Go Router 14.0以降では、routerConfigだけで設定可能
+      routerConfig: router,
+      
+      // 古いバージョンでは以下の3つの設定が必要
+      // routeInformationParser: router.routeInformationParser,
+      // routerDelegate: router.routerDelegate,
+      // routeInformationProvider: router.routeInformationProvider,
+    );
+  }
+}
+```
+
+## ナビゲーションの基本
+
+### 画面遷移
+
+```dart
+// 次の画面へ移動（新しい画面をスタックに追加）
+context.go('/details/123');
+
+// 名前付きルートで移動
+context.goNamed(
+  'details',
+  pathParameters: {'id': '123'},
+);
+
+// クエリパラメータの使用
+context.go('/search?query=flutter');
+```
+
+### 戻る操作
+
+```dart
+// 前の画面に戻る
+context.pop();
+
+// 結果を返して戻る
+context.pop('result data');
+```
+
+## パラメータの取得
+
+### パスパラメータ
+
+```dart
+GoRoute(
+  path: '/user/:userId/post/:postId',
+  builder: (context, state) {
+    final userId = state.pathParameters['userId']!;
+    final postId = state.pathParameters['postId']!;
+    return UserPostScreen(userId: userId, postId: postId);
+  },
+);
+```
+
+### クエリパラメータ
+
+```dart
+GoRoute(
+  path: '/search',
+  builder: (context, state) {
+    final query = state.uri.queryParameters['query'];
+    final page = int.tryParse(state.uri.queryParameters['page'] ?? '1') ?? 1;
+    return SearchScreen(query: query, page: page);
+  },
+);
+```
+
+### Extra（追加データ）
+
+```dart
+// データを渡す側
+context.go('/details', extra: {'user': user, 'isAdmin': true});
+
+// データを受け取る側
+GoRoute(
+  path: '/details',
+  builder: (context, state) {
+    final extraMap = state.extra as Map<String, dynamic>?;
+    final user = extraMap?['user'] as User?;
+    final isAdmin = extraMap?['isAdmin'] as bool? ?? false;
+    return DetailsScreen(user: user, isAdmin: isAdmin);
+  },
+);
+```
+
+## リダイレクト
+
+### グローバルリダイレクト
+
+```dart
+final router = GoRouter(
+  initialLocation: '/',
+  redirect: (BuildContext context, GoRouterState state) {
+    // 認証チェックなどの条件に基づくリダイレクト
+    final isLoggedIn = AuthService.isLoggedIn;
+    final isGoingToLogin = state.uri.path == '/login';
+
+    if (!isLoggedIn && !isGoingToLogin) {
+      return '/login';
+    }
+    if (isLoggedIn && isGoingToLogin) {
+      return '/';
+    }
+    return null; // リダイレクトなし
+  },
+  routes: [
+    // ルート定義
+  ],
+);
+```
+
+### ルート固有のリダイレクト
+
+```dart
+GoRoute(
+  path: '/admin',
+  redirect: (BuildContext context, GoRouterState state) {
+    final isAdmin = AuthService.isAdmin;
+    if (!isAdmin) {
+      return '/unauthorized';
+    }
+    return null; // リダイレクトなし
+  },
+  builder: (context, state) => AdminScreen(),
+),
+```
+
+## StatefulShellRoute（タブナビゲーション）
+
+```dart
+final router = GoRouter(
+  initialLocation: '/home',
+  routes: [
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) {
+        // カスタムシェル（通常はBottomNavigationBarを含むScaffold）
+        return ScaffoldWithNavBar(navigationShell);
+      },
+      branches: [
+        // 最初のタブ/ブランチ
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/home',
+              builder: (context, state) => HomeScreen(),
+            ),
+          ],
+        ),
+        // 2番目のタブ/ブランチ
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: '/profile',
+              builder: (context, state) => ProfileScreen(),
+            ),
+          ],
+        ),
+      ],
+    ),
+  ],
+);
+
+// ボトムナビゲーションバー付きのScaffold
+class ScaffoldWithNavBar extends StatelessWidget {
+  final StatefulNavigationShell navigationShell;
+
+  ScaffoldWithNavBar(this.navigationShell);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: navigationShell,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: navigationShell.currentIndex,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
+        onTap: (index) {
+          // タブ間の移動
+          navigationShell.goBranch(
+            index,
+            // 既に選択されているタブを再度タップした場合、初期位置に戻る
+            initialLocation: index == navigationShell.currentIndex,
+          );
+        },
+      ),
+    );
+  }
+}
+```
+
+## 型安全なルート
+
+カスタム列挙型とエクステンションメソッドを使用して型安全なルートを定義できます：
+
+```dart
+// ルート列挙型
+enum AppRoute {
+  home('/'),
+  details('/details/:id'),
+  settings('/settings'),
+  profile('/profile');
+
+  final String path;
+  const AppRoute(this.path);
+}
+
+// Go Router拡張
+extension GoRouterExtension on GoRouter {
+  void pushNamed(AppRoute route, {Map<String, String>? pathParameters}) {
+    pushNamed(route.name, pathParameters: pathParameters);
+  }
+}
+
+// Buildコンテキスト拡張
+extension BuildContextExtension on BuildContext {
+  void goToRoute(AppRoute route, {Map<String, String>? pathParameters}) {
+    GoRouter.of(this).goNamed(route.name, pathParameters: pathParameters);
+  }
+}
+
+// 使用例
+context.goToRoute(AppRoute.details, pathParameters: {'id': '123'});
+```
+
+## ルート定義の整理
+
+大規模アプリでのルート管理はレイヤー分けが効果的です：
+
+```
+lib/
+ ├── core/
+ |    └── app_routes.dart  // 中央管理されたルート定数
+ ├── features/
+ |    ├── feature_a/
+ |    |    └── routes.dart  // 機能固有のルート
+ |    └── feature_b/
+ |         └── routes.dart
+ └── app/
+      ├── router.dart      // すべてのルートを集約
+      └── main.dart
+```
+
+## エラーハンドリング
+
+```dart
+final router = GoRouter(
+  initialLocation: '/',
+  routes: [
+    // ルート定義
+  ],
+  errorBuilder: (context, state) {
+    // エラーが発生した場合に表示するウィジェット
+    return ErrorScreen(error: state.error);
+  },
+);
+```
+
+## NavigatorObserverの追加
+
+```dart
+class MyNavigatorObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    print('Pushed route: ${route.settings.name}');
+  }
+  
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    print('Popped route: ${route.settings.name}');
+  }
+}
+
+final router = GoRouter(
+  // ... 他の設定
+  observers: [
+    MyNavigatorObserver(),
+  ],
+);
+```
+
+## ディープリンク処理
+
+Go Routerはディープリンクを自動的に処理します。AndroidとiOSの設定は従来のディープリンク設定と同じです。 
